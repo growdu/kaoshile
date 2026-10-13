@@ -22,6 +22,7 @@ from app.repository.schemas import (
     SubscriptionOut,
 )
 from app.repository.subscription_repo import SubscriptionRepository
+from app.repository.notification_log_repo import NotificationLogRepository
 from app.usecase.subscription import SubscriptionError, SubscriptionService
 from app.usecase.notification import NotificationService
 
@@ -29,7 +30,7 @@ router = APIRouter()
 
 
 def _service(db: Session) -> SubscriptionService:
-    notifier = NotificationService()
+    notifier = NotificationService(log_repo=NotificationLogRepository(db))
     return SubscriptionService(
         ExamRepository(db),
         SubscriptionRepository(db),

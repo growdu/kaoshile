@@ -136,7 +136,7 @@ class SubscriptionService:
 
         # 通知（v1 同步发送；M7 调度器启用后可改为 enqueue）
         if self.notifier is not None:
-            self.notifier.dispatch(
+            self.notifier.send_one_off(
                 sub,
                 subject=f"请确认订阅：{exam.name}",
                 body=(

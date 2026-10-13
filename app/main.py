@@ -19,6 +19,7 @@ from app.api.public import router as public_router
 from app.config import get_settings
 from app.infra.db import get_engine, init_db
 from app.infra.logging import configure_logging, get_logger
+from app.scheduler.scheduler import start_scheduler, stop_scheduler
 
 log = get_logger(__name__)
 
@@ -29,8 +30,10 @@ async def lifespan(app: FastAPI):
     configure_logging()
     log.info("startup", version=__version__, app_env=get_settings().app_env)
     init_db()
+    start_scheduler()
     log.info("startup_complete")
     yield
+    stop_scheduler()
     log.info("shutdown")
 
 
