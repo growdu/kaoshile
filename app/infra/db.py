@@ -48,11 +48,12 @@ def get_session_factory() -> sessionmaker[Session]:
 
 
 def get_db() -> Generator[Session, None, None]:
-    """FastAPI 依赖：yield 一个 Session，异常时回滚。"""
+    """FastAPI 依赖：yield 一个 Session，正常时 commit，异常时 rollback。"""
     session_factory = get_session_factory()
     session = session_factory()
     try:
         yield session
+        session.commit()
     except Exception:
         session.rollback()
         raise
