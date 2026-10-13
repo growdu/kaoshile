@@ -27,6 +27,9 @@ aliyun = [
     "alibabacloud_dm20151123>=1.0",
     "alibabacloud_tea_openapi>=0.3",
 ]
+redis_lock = [
+    "redis>=5.0",
+]
 
 [build-system]
 requires = ["hatchling"]
