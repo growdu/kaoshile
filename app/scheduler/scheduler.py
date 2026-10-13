@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.infra.db import get_session_factory
 from app.infra.logging import get_logger
 from app.scheduler.node_scanner import scan_now
+from app.scheduler.pii_cleanup import run as pii_run
 from app.scheduler.verification_watchdog import run as watchdog_run
 
 log = get_logger(__name__)
@@ -39,6 +40,16 @@ def start_scheduler() -> AsyncIOScheduler:
         hour=3,
         minute=0,
         id="verification_watchdog",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _pii_cleanup_job,
+        "cron",
+        hour=4,
+        minute=0,
+        id="pii_cleanup",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -83,3 +94,14 @@ def _watchdog_job() -> None:
             log.warning("verification_watchdog_drafted", count=n)
     except Exception:  # noqa: BLE001
         log.exception("watchdog_failed")
+
+
+def _pii_cleanup_job() -> None:
+    """PII 清理：每天 04:00 跑一次。"""
+    try:
+        session_factory = get_session_factory()
+        n = pii_run(session_factory)
+        if n:
+            log.info("pii_cleanup_done", count=n)
+    except Exception:  # noqa: BLE001
+        log.exception("pii_cleanup_failed")
