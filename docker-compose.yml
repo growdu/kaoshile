@@ -1,0 +1,32 @@
+# docker-compose.yml — 本地 / 单机部署
+#
+# 用法：
+# 1. cp .env.example .env 并填真实凭据
+# 2. docker compose up -d
+# 3. 访问 http://localhost:8000/healthz
+# 4. 灌入 demo: docker compose exec api python scripts/seed_demo.py
+
+services:
+  api:
+    build: .
+    image: kaoshile:0.1.0
+    container_name: kaoshile-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:////data/app.db
+      APP_ENV: prod
+    ports:
+      - "8000:8000"
+    volumes:
+      - kaoshile-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  kaoshile-data:
