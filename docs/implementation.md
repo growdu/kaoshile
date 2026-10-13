@@ -22,7 +22,7 @@
 
 | # | 里程碑 | 子模块 / 提交单元 | 验收 |
 | --- | --- | --- | --- |
-| **M0** | 项目脚手架 | pyproject / 目录骨架 / 配置层 / 日志 / db 启动 / 健康检查 | `pytest` 空跑通过；`/healthz` 200 |
+| **M0** ✅ | 项目脚手架 | pyproject / 目录骨架 / 配置层 / 日志 / db 启动 / 健康检查 | `pytest` 62 passed；`/healthz` + `/readyz` 200 |
 | **M1** | 数据层 | SQLAlchemy 模型 + Alembic 初始迁移（包含 `source_url` / `source_hash` / `last_verified_at` / `verifier` 字段） | `pytest` 通过；`alembic upgrade head` 成功 |
 | **M1.5** | 数据源白名单（代码侧） | `app/data_sources/whitelist.py` 暴露 `data_sources.md §3` 白名单 + 单元测试（与文档同步） | 单元测试覆盖白名单结构；调用方拼装 URL 不硬编码 |
 | **M2** | 领域层 | `reminder_policy.compute_send_times` + `tokens` 模块 | 单元测试覆盖 3 档位 + token 签发/校验 |
@@ -722,6 +722,7 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 | 2026-10-13 | 通知通道抽象为 Protocol | 允许 mock + 未来加微信 | Mavis |
 | 2026-10-13 | v1 不爬取；考试数据靠人工 + 解析助手；首屏按 `seed_exams.md` 灌入 | 落地数据可靠性、可追溯；明确 RSS / 抓取推迟到 v1.1 / v2 | Mavis |
 | 2026-10-13 | 考试记录加 `source_url` / `source_hash` / `last_verified_at` / `verifier`；90 天未复核自动 `draft` 化 | 数据可见可追；管理员不能"忘记" | Mavis |
+| 2026-10-13 | M0 完成：脚手架 / config / time / logging / db / FastAPI + /healthz + /readyz；62 测试全绿 | 进入 M1（数据层） | Mavis |
 
 ---
 
