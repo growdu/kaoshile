@@ -27,11 +27,14 @@
 ### 1.3 非目标（v1.0 不做）
 
 - 报名 / 缴费 / 准考证打印的**实际代办**（本服务只做提醒，不代操作）；
-- 公告原文爬取（v1 由管理员手工录入，v2 再考虑爬虫）；
+- 主动爬取公告原文（v1 由管理员手工录入，**v1 不抓任何页面**；v2 受限抓取范围详见 `data_sources.md §8.2`）；
+- 商业 / 厂商认证（PMP、阿里云 / 华为云 / 腾讯云 / AWS、CISCO、Red Hat、ACCA/CFA/FRM 等）——它们有自己的平台，节奏完全不同；
 - 微信 / 钉钉 / App Push 通知（仅邮件 + 短信）；
 - 多语言（v1 仅简体中文）；
 - 移动端原生 App（响应式 Web 即可）；
 - 付费 / 会员体系。
+
+> 数据来源策略详见 [`data_sources.md`](./data_sources.md)，首屏灌入清单见 [`seed_exams.md`](./seed_exams.md)。
 
 ---
 
@@ -203,7 +206,11 @@
 | payment_end | datetime | 否 | 缴费截止 |
 | admission_ticket_start | datetime | 否 | 准考证打印开始 |
 | exam_date | datetime | 是 | 考试日 |
-| official_url | string | 否 | 官方公告链接 |
+| official_url | string | 否 | 官方公告链接（用户详情页展示） |
+| source_url | string | 是 | 录入时所依据的公告 URL（用于复核） |
+| source_hash | string | 否 | 公告正文 SHA256（变更检测用） |
+| last_verified_at | datetime | 否 | 上次人工复核时间，超过 30 天在后台告警 |
+| verifier | string | 否 | 上次复核的管理员账号 |
 | status | enum | 是 | draft / open / registration_closed / archived |
 | created_at / updated_at | datetime | 系统 | |
 
@@ -245,7 +252,9 @@
 - **C2** 短信签名与模板必须事先在阿里云控制台审核通过（合规要求）；
 - **C3** 单实例调度器假定进程内调度可靠；如部署多实例，需引入 Redis 锁（v1.1 考虑）；
 - **C4** 时间统一使用 **Asia/Shanghai**（UTC+8）；
-- **C5** 假设考试目录数据由管理员手工维护，v1 不爬取。
+- **C5** 考试目录数据由管理员手工维护，v1 **不爬取**任何页面（详细数据策略见 [`data_sources.md`](./data_sources.md)）；
+- **C6** 首屏考试目录的初始灌入清单按 [`seed_exams.md`](./seed_exams.md) 落地，灌入前管理员必须人工复核；
+- **C7** 每条考试记录带 `last_verified_at` 字段，超过 30 天未复核时进入管理员后台告警；超过 90 天自动转入 `draft` 状态。
 
 ---
 
@@ -258,14 +267,19 @@
 3. ✅ 在测试环境下，完整跑通「订阅 → 确认 → 节点到达 → 收到通知 → 退订」主链路；
 4. ✅ 阿里云两个通道均能成功发送一封真实邮件与一条真实短信（带脱敏收件人）；
 5. ✅ 关键失败路径（邮件 API 失败 / 短信 API 失败）能正确重试并标记失败；
-6. ✅ README.md / 设计文档 / 实现方案与代码一致；
-7. ✅ 提交一组 demo 数据（≥ 3 场考试、≥ 5 条订阅）用于验收。
+6. ✅ README.md / 设计文档 / 实现方案 / 数据源文档与代码一致；
+7. ✅ 提交一组 demo 数据（按 `seed_exams.md` 选取 ≥ 10 类别 / ≥ 30 场考试 / ≥ 5 条订阅）用于验收；
+8. ✅ 每条 demo 考试 `source_url` 与 `last_verified_at` 字段完整录入；
+9. ✅ 90 天未复核自动 `draft` 化逻辑可在测试环境验证。
 
 ---
 
 ## 9. 后续迭代建议（非 v1 范围）
 
-- 公告原文爬取（多源聚合）；
+- **v1.1**：RSS / 邮件订阅聚合（详见 `data_sources.md §8.1`）；
+- **v1.1**：用户自助申报入口（详情 + 贡献者信誉系统雏形）；
+- **v2**：受限抓取（仅白名单源、需 `robots.txt` 允许、必须人工审核入库）；
+- **v2**：解析助手规则升级（基于具体源的版面适配）；
 - 微信 / 钉钉 / 飞书通知通道；
 - 用户账号体系（OAuth、找回订阅）；
 - 多实例分布式调度（Redis 锁 / 分片）；

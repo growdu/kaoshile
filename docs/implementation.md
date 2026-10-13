@@ -23,20 +23,23 @@
 | # | 里程碑 | 子模块 / 提交单元 | 验收 |
 | --- | --- | --- | --- |
 | **M0** | 项目脚手架 | pyproject / 目录骨架 / 配置层 / 日志 / db 启动 / 健康检查 | `pytest` 空跑通过；`/healthz` 200 |
-| **M1** | 数据层 | SQLAlchemy 模型 + Alembic 初始迁移 | `pytest` 通过；`alembic upgrade head` 成功 |
+| **M1** | 数据层 | SQLAlchemy 模型 + Alembic 初始迁移（包含 `source_url` / `source_hash` / `last_verified_at` / `verifier` 字段） | `pytest` 通过；`alembic upgrade head` 成功 |
+| **M1.5** | 数据源白名单（代码侧） | `app/data_sources/whitelist.py` 暴露 `data_sources.md §3` 白名单 + 单元测试（与文档同步） | 单元测试覆盖白名单结构；调用方拼装 URL 不硬编码 |
 | **M2** | 领域层 | `reminder_policy.compute_send_times` + `tokens` 模块 | 单元测试覆盖 3 档位 + token 签发/校验 |
 | **M3** | 通知通道抽象 | `Channel` Protocol + `MockChannel` + 工厂 | 单元测试覆盖 happy / retry / final-fail |
 | **M4** | 考试目录 API | `GET /api/exams` + `GET /api/exams/{id}` | 集成测试覆盖过滤、分页、空态 |
+| **M4.5** | 解析助手 | `app/services/parse_helper.py` 从公告文本提取关键字段 | 单元测试覆盖 5+ 真实公告样本；不自动提交 |
 | **M5** | 订阅用例 + API | `POST /api/subscriptions` + 确认页 | 集成测试覆盖 pending → active；确认邮件 / 短信已 Mock 接收 |
 | **M6** | 退订用例 + API | `POST /api/subscriptions/cancel` + 退订落地页 | 集成测试覆盖 token 失效、重复退订 |
 | **M7** | 调度器 + 通知扇出 | `node_scanner` + `NotificationService.dispatch` + 重试 | 集成测试用 freezegun 触发节点，断言 Mock 通道调用次数 |
 | **M8** | 我的订阅页 + token 访问 | `GET /api/subscriptions/me` + 通知历史列表 | 集成测试覆盖鉴权失败、成功列表 |
-| **M9** | 管理员后台 | 登录 + 考试 CRUD + 订阅 / 日志查询 | 集成测试覆盖鉴权 + 各 CRUD |
+| **M9** | 管理员后台 | 登录 + 考试 CRUD（带 source_url / last_verified_at）+ 订阅 / 日志查询 + 「复核」按钮 + 过期告警 | 集成测试覆盖鉴权 + 各 CRUD + 复核状态变更 |
 | **M10** | 阿里云真实通道 | `EmailAliyunChannel` + `SmsAliyunChannel` | 联通性脚本成功发送测试邮件 / 短信（沙箱） |
 | **M11** | 模板渲染 + 文案 | 邮件 / 短信模板渲染（含退订链接） | 模板单测覆盖占位符替换 |
 | **M12** | Docker / 部署脚本 | Dockerfile + docker-compose + nginx 配置示例 | `docker build` 成功；`docker run` 起服务 |
-| **M13** | 灌入 demo 数据 | `scripts/seed_demo.py`（≥ 3 场考试、≥ 5 条订阅） | 手动跑一遍主链路 |
-| **M14** | PII 清理 job | `cleanup.py` + 调度接入 | 集成测试覆盖 7 天后清理 |
+| **M13** | 灌入 demo 数据 | `scripts/seed_demo.py` 按 `seed_exams.md` 选取 ≥ 10 类别 / ≥ 30 场考试 + ≥ 5 条订阅；首屏启动展示 | 手动跑一遍主链路 |
+| **M14** | 复核过期自动 draft 化 | `app/scheduler/verification_watchdog.py` 每日扫描；90 天未复核置 `draft` | 集成测试 freezegun +90 天后断言 |
+| **M15** | PII 清理 job | `cleanup.py` + 调度接入 | 集成测试覆盖 7 天后清理 |
 
 每个里程碑**至少 1 个 commit**，每个 commit 必须配套：
 
@@ -185,12 +188,18 @@ class Exam(Base):
     admission_ticket_start: Mapped[datetime | None]
     exam_date: Mapped[datetime]
     official_url: Mapped[str | None] = mapped_column(String(500))
+    # 数据可靠性字段（见 data_sources.md §4.2）
+    source_url: Mapped[str] = mapped_column(String(500))
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    last_verified_at: Mapped[datetime | None]
+    verifier: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[ExamStatus] = mapped_column(Enum(ExamStatus))
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
         Index("ix_exam_status_reg_end", "status", "registration_end"),
+        Index("ix_exam_last_verified_at", "last_verified_at"),  # 复核告警用
     )
 
 class Subscription(Base):
@@ -682,7 +691,10 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 2. 选一场考试 → 订阅 → 邮箱收到确认链接 → 点击 → 状态变 active；
 3. `pytest tests/integration/test_scheduler_e2e.py` 用 freezegun 跳到节点时刻，断言 Mock 通道收到对应发送；
 4. 邮件中点退订 → 订阅 cancelled；
-5. 管理员后台登录 → 看订阅列表、看发送日志、看失败记录。
+5. 管理员后台登录 → 看订阅列表、看发送日志、看失败记录；
+6. **数据可靠性检查**：
+   - 管理员后台应能对每条考试「复核」 → `last_verified_at` 更新；
+   - 模拟某条考试 `last_verified_at = 91 天前` → 运行复核 watchdog → 该条状态自动变 `draft`，从目录消失。
 
 ---
 
@@ -708,6 +720,8 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 | --- | --- | --- | --- |
 | 2026-10-13 | 选用 FastAPI + APScheduler 单体起步 | 锁定 v1 架构 | Mavis |
 | 2026-10-13 | 通知通道抽象为 Protocol | 允许 mock + 未来加微信 | Mavis |
+| 2026-10-13 | v1 不爬取；考试数据靠人工 + 解析助手；首屏按 `seed_exams.md` 灌入 | 落地数据可靠性、可追溯；明确 RSS / 抓取推迟到 v1.1 / v2 | Mavis |
+| 2026-10-13 | 考试记录加 `source_url` / `source_hash` / `last_verified_at` / `verifier`；90 天未复核自动 `draft` 化 | 数据可见可追；管理员不能"忘记" | Mavis |
 
 ---
 

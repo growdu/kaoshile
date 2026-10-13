@@ -216,12 +216,24 @@ Exam 1 ──< Subscription >── 1 NotificationLog
 - `subscription(email, status)` — 用户查询自己的订阅；
 - `subscription(exam_id, status)` — 调度扇出时的批量查询；
 - `notification_log(subscription_id, node_type, channel)` 唯一约束 — 保证 idempotent；
-- `exam(status, registration_end)` — 目录列表按状态过滤。
+- `exam(status, registration_end)` — 目录列表按状态过滤；
+- `exam(last_verified_at)` — 复核告警 job 用。
 
 **约束**：
 
 - 同一 `(email, exam_id, status=active)` 不允许多条（部分唯一索引，处理时需 `INSERT ... ON CONFLICT` 或应用层判断）；
 - `notification_log` 同一 `(subscription_id, node_type, channel)` 唯一。
+
+**考试记录的额外字段**（数据可靠性相关）：
+
+| 字段 | 类型 | 用途 |
+| --- | --- | --- |
+| `source_url` | string（必填） | 录入时所依据的官方公告 URL |
+| `source_hash` | string | 公告正文 SHA256，用于变更检测 |
+| `last_verified_at` | datetime | 上次人工复核时间 |
+| `verifier` | string | 上次复核管理员账号 |
+
+> 复核规则与告警见 `data_sources.md §4.4`。
 
 ---
 
@@ -558,6 +570,9 @@ LOG_LEVEL=INFO
 | 数据丢失 | 订阅 / 日志丢失 | 日备份 SQLite；生产切 PG 后由云厂商负责 |
 | 调度器重启丢任务 | 错过节点 | 扫描 + 队列模式不丢；启动时立即跑一次 scan_now |
 | HMAC token 泄漏 | 任意人退订 | token 中带 `exp`；过期 30 天；定期轮换 `LINK_SECRET` |
+| 考试公告变更未被识别 | 用户收到过期时间提醒 | `last_verified_at` 复核 + `source_hash` 变更检测（见 `data_sources.md §5`） |
+| 管理员长期不复核 | 用户看到过期数据 | 30 天告警；90 天自动 `draft` 化 |
+| 误录商业认证 | 偏离产品定位 | `seed_exams.md §10` 明确不收录清单 + 解析助手分类校验 |
 
 ---
 

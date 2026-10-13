@@ -1,7 +1,7 @@
 # 考试通知软件 — 文档索引
 
 > 项目代号：**kaoshile**（考试乐）
-> 文档版本：v0.1（2026-10-13）
+> 文档版本：v0.2（2026-10-13）
 > 维护者：Mavis
 
 本目录存放考试通知软件的**需求、设计与实现方案**。所有开发活动以本文档集合为准；任何需求或架构变更需先更新文档，再动手改代码。
@@ -12,11 +12,14 @@
 
 | 文件 | 用途 | 受众 |
 | --- | --- | --- |
+| [README.md](./README.md) | 文档索引与关键决策记录（本文） | 所有人 |
 | [requirements.md](./requirements.md) | 需求文档：业务目标、功能性 / 非功能性需求、验收标准 | 产品 / 研发 / 测试 |
 | [design.md](./design.md) | 设计文档：架构、技术栈、模块、数据模型、关键流程、API | 研发 |
 | [implementation.md](./implementation.md) | 实现方案：里程碑、目录结构、代码骨架、测试策略、commit 节奏 | 研发 |
+| [data_sources.md](./data_sources.md) | 数据源策略与白名单：数据从哪儿来、怎么录、怎么复核 | 研发 / 数据维护员 |
+| [seed_exams.md](./seed_exams.md) | 首屏考试目录初始灌入清单（10 类 50+ 场考试） | 研发 / 数据维护员 |
 
-建议阅读顺序：**requirements → design → implementation**。
+建议阅读顺序：**README → requirements → data_sources / seed_exams → design → implementation**。
 
 ---
 
@@ -31,12 +34,15 @@
 | 项 | 决策 | 备注 |
 | --- | --- | --- |
 | 软件形态 | Web 应用（前后端分离） | 用户可浏览器访问 |
-| 技术栈 | 待 `design.md` 推荐（Python FastAPI + APScheduler 为推荐项） | 由设计文档给出理由 |
+| 技术栈 | Python 3.11 + FastAPI + APScheduler | 见 `design.md §2.1` 推荐理由 |
 | 邮件通道 | 阿里云邮件推送（DirectMail） | 国内送达率高，中文文档完善 |
 | 短信通道 | 阿里云短信（SMS） | 与邮件同账号管理 |
 | 数据存储 | SQLite（开发期）/ PostgreSQL（生产） | 见 `design.md` 数据层 |
-| 调度机制 | APScheduler（内存 + 持久化作业存储） | 见 `design.md` 调度层 |
+| 调度机制 | APScheduler AsyncIOScheduler + 内存队列 | 见 `design.md` 调度层 |
 | 部署目标 | 单进程 Docker 容器起步，可横向扩展为 Worker 拆分 | 见 `design.md` 部署拓扑 |
+| 数据来源 | v1 人工录入 + 解析助手；v1.1 RSS 聚合；v2 受限抓取 | 见 `data_sources.md` |
+| 首屏考试 | 按 `seed_exams.md` 录入，初始 10 类 50+ 场 | 见 `seed_exams.md` |
+| 复核机制 | 30 天未复核告警、90 天未复核自动 `draft` 化 | 见 `data_sources.md §4.4` |
 
 任何后续决策的变更都需要：
 1. 在本文档「关键决策记录」追加一行；
@@ -56,3 +62,4 @@
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v0.1 | 2026-10-13 | 初始版本：建立 README、requirements、design、implementation |
+| v0.2 | 2026-10-13 | 新增 `data_sources.md` / `seed_exams.md`；更新 requirements / README 引用数据源策略 |
