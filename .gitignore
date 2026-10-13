@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# 测试 / 覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# 环境配置（真实凭据不入库）
+.env
+.env.local
+
+# 数据
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志
+*.log
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# uv
+uv.lock
