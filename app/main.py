@@ -10,10 +10,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import __version__
+from app.api.public import router as public_router
 from app.config import get_settings
 from app.infra.db import get_engine, init_db
 from app.infra.logging import configure_logging, get_logger
@@ -71,6 +73,22 @@ def create_app() -> FastAPI:
                 "docs": "/docs",
             },
         }
+
+    # ---------- 业务路由 ----------
+    app.include_router(public_router)
+
+    # ---------- 统一错误信封 ----------
+    @app.exception_handler(HTTPException)
+    async def _http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+        # 如果 detail 已经是信封形式，直接用；否则包装
+        if isinstance(exc.detail, dict) and "ok" in exc.detail:
+            payload = exc.detail
+        else:
+            payload = {
+                "ok": False,
+                "error": {"code": f"http_{exc.status_code}", "message": str(exc.detail)},
+            }
+        return JSONResponse(status_code=exc.status_code, content=payload)
 
     return app
 
