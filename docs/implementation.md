@@ -736,6 +736,11 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 | 2026-10-13 | M12+M13 完成：Dockerfile + docker-compose + seed_demo.py（32 场考试 / 5 条订阅 / 幂等） | 上线即用 | Mavis |
 | 2026-10-13 | M14+M15 完成：复核 watchdog（90 天自动 draft）+ PII 清理（7 天清空邮箱手机） | 数据可靠性 + 合规 | Mavis |
 | 2026-10-13 | **v1 上线就绪**：248 测试全绿；14 个 commit；覆盖 requirements §8 全部 P0/P1 | 进入生产部署 | Mavis |
+| 2026-10-13 | V2.1：解析助手 parse_helper（5+ 真实样本测试，4 种日期格式 + 缺失字段提示） | 管理员录入效率提升，可对接 fetcher | Mavis |
+| 2026-10-13 | V2.2：受限抓取器 Fetcher（whitelist gate + robots.txt 缓存 + 6 小时冷却 + 非白名单拒绝） | 合规抓取前置就位；v2 启用抓取 | Mavis |
+| 2026-10-13 | V2.3：数据看板 API（总览 / 订阅热度 / 成功率 / 过期考试）+ 管理员鉴权 | 维护侧可观测 | Mavis |
+| 2026-10-13 | V2.4：微信通道（MockWechatChannel + WechatChannel 占位，企业微信应用消息 API） | 多通道扩展点已落地 | Mavis |
+| 2026-10-13 | **v2 完成**：283 测试全绿；5 个 commit；V2.5 docs 更新 | 进入 v3 规划 | Mavis |
 
 ---
 
