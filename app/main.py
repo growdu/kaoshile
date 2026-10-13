@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import __version__
+from app.api.manage import router as manage_router
 from app.api.public import router as public_router
 from app.config import get_settings
 from app.infra.db import get_engine, init_db
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
 
     # ---------- 业务路由 ----------
     app.include_router(public_router)
+    app.include_router(manage_router)
 
     # ---------- 统一错误信封 ----------
     @app.exception_handler(HTTPException)
