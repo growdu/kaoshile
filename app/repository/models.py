@@ -157,3 +157,18 @@ class NotificationLog(Base):
     )
 
     subscription: Mapped["Subscription"] = relationship(back_populates="notifications")
+
+
+class User(Base):
+    """用户账户（v3 可选注册；保留邮箱 + bcrypt 密码哈希）。"""
+
+    __tablename__ = "user"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)
+    email: Mapped[str] = mapped_column(String(200), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(200))
+    phone: Mapped[str | None] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    __table_args__ = (Index("ix_user_email", "email"),)

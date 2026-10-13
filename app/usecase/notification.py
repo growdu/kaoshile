@@ -36,20 +36,37 @@ class NotificationService:
 
     def send_one_off(
         self,
-        subscription: Subscription,
+        subscription_or_email,
         *,
         subject: str,
         body: str,
     ) -> list[str]:
-        """一次性通知（不写 NotificationLog，用于订阅确认 / 退订确认）。"""
+        """一次性通知（不写 NotificationLog）。
+
+        Args:
+            subscription_or_email: Subscription 对象 → 走其 channels + email/phone；
+                                或 str → 视为 email，单通道 email。
+        """
+        from app.repository.models import Subscription as Sub  # noqa: PLC0415
+
+        if isinstance(subscription_or_email, Sub):
+            sub = subscription_or_email
+            channels = sub.channels
+            email = sub.email
+            phone = sub.phone
+        else:
+            channels = ["email"]
+            email = str(subscription_or_email)
+            phone = ""
+
         errors: list[str] = []
-        for ch_name in subscription.channels:
+        for ch_name in channels:
             try:
                 channel = registry_get(ch_name)
             except KeyError:
                 errors.append(f"channel {ch_name!r} not registered")
                 continue
-            recipient = subscription.email if ch_name == "email" else subscription.phone
+            recipient = email if ch_name == "email" else phone
             try:
                 result = channel.send(recipient, subject, body)
                 if not result.success:
