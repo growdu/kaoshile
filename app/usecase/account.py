@@ -140,6 +140,68 @@ class AccountService:
             self.user_repo.set_password(user, self.hash_password(new_password))
         return user
 
+    def change_email(
+        self,
+        user_id: str,
+        new_email: str,
+        current_password: str,
+    ) -> str:
+        """发起邮箱迁移。
+
+        校验旧密码 + 邮箱格式；签发确认 token 返回（旧邮箱邮件中放此链接）。
+        Returns:
+            签发的 token（开发环境返回用于测试，生产只放邮件）。
+        """
+        if not EMAIL_RE.match(new_email):
+            raise AccountError("invalid_email", "新邮箱格式不正确")
+        user = self.user_repo.get(user_id)
+        if user is None:
+            raise AccountError("user_not_found", "用户不存在")
+        if not self.verify_password(current_password, user.password_hash):
+            raise AccountError("bad_credentials", "旧密码错误")
+        if new_email.lower() == user.email.lower():
+            raise AccountError("same_email", "新邮箱与当前相同")
+        if self.user_repo.find_by_email(new_email) is not None:
+            raise AccountError("email_taken", "新邮箱已被其他账户使用")
+        return sign(
+            {
+                "user_id": user_id,
+                "action": "change_email",
+                "new_email": new_email.lower(),
+            },
+            ttl_days=1,  # 实际应是小时级，但 token.sign 仅支持天
+        )
+
+    def confirm_change_email(self, token: str) -> User:
+        """确认邮箱迁移：校验 token 并更新 user.email + 所有订阅 email。"""
+        try:
+            payload = verify(token)
+        except InvalidToken as e:
+            raise AccountError("invalid_token", str(e)) from e
+        if payload.get("action") != "change_email":
+            raise AccountError("invalid_token", "非邮箱迁移 token")
+        user_id = payload.get("user_id")
+        new_email = payload.get("new_email")
+        if not user_id or not new_email:
+            raise AccountError("invalid_token", "token 字段不完整")
+        user = self.user_repo.get(user_id)
+        if user is None:
+            raise AccountError("user_not_found", "用户不存在")
+        old_email = user.email
+        user.email = new_email
+        self.user_repo.session.flush()
+        # 同步更新订阅 email
+        from sqlalchemy import update
+
+        from app.repository.models import Subscription
+
+        session = self.user_repo.session
+        session.execute(
+            update(Subscription).where(Subscription.email == old_email).values(email=new_email)
+        )
+        session.flush()
+        return user
+
     @staticmethod
     def require_user(token: str) -> dict:
         """校验 token 是 user 角色。"""

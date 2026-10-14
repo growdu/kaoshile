@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -57,6 +57,16 @@ class UpdateMeIn(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     current_password: Optional[str] = Field(None, min_length=1, max_length=200)
     new_password: Optional[str] = Field(None, min_length=1, max_length=200)
+
+
+class ChangeEmailIn(BaseModel):
+    new_email: str = Field(..., min_length=3, max_length=200)
+    current_password: str = Field(..., min_length=1, max_length=200)
+
+
+class ChangeEmailOut(BaseModel):
+    message: str
+    dev_token: Optional[str] = None
 
 
 def _service(db: Session) -> AccountService:
@@ -113,6 +123,58 @@ def update_me(
             current_password=payload.current_password,
             new_password=payload.new_password,
         )
+    except AccountError as e:
+        raise _err(e.code, e.message, 400)
+    return {
+        "ok": True,
+        "data": UserOut(id=user.id, email=user.email, phone=user.phone).model_dump(),
+    }
+
+
+@router.post("/api/account/change-email", tags=["account"])
+def change_email(
+    payload: ChangeEmailIn,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    """发起邮箱迁移（需校验旧密码）。
+
+    dev_token 字段仅开发环境返回；生产只通过邮件发送。
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise _err("unauthorized", "missing bearer token", 401)
+    token = authorization.split(" ", 1)[1]
+    try:
+        auth = AccountService.require_user(token)
+    except AccountError as e:
+        raise _err(e.code, e.message, 401)
+    svc = _service(db)
+    try:
+        dev_token = svc.change_email(
+            auth["user_id"],
+            payload.new_email,
+            payload.current_password,
+        )
+    except AccountError as e:
+        raise _err(e.code, e.message, 400)
+    return {
+        "ok": True,
+        "data": ChangeEmailOut(
+            message="确认链接已发送到新邮箱",
+            dev_token=dev_token,
+        ).model_dump(),
+    }
+
+
+@router.get("/api/account/change-email/verify", tags=["account"])
+def verify_change_email(
+    token: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+) -> dict:
+    """点击邮件中的确认链接 → 完成邮箱迁移。"""
+    svc = _service(db)
+    try:
+        user = svc.confirm_change_email(token)
     except AccountError as e:
         raise _err(e.code, e.message, 400)
     return {

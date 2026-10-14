@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
-from app.repository.orm import Base
+from app.repository.orm import Base, SubscriptionStatus
 
 
 @pytest.fixture
@@ -266,5 +266,114 @@ class TestUpdateMe:
     def test_no_token_401(self, client):
         r = client.patch(
             "/api/account/me", json={"phone": "13800138001"}
+        )
+        assert r.status_code == 401
+
+
+class TestChangeEmail:
+    """POST /api/account/change-email + verify。"""
+
+    def _register_login(self, client, *, email="old@example.com", password="password123"):
+        client.post(
+            "/api/account/register",
+            json={"email": email, "password": password},
+        )
+        r = client.post(
+            "/api/account/login", json={"email": email, "password": password}
+        )
+        return r.json()["data"]["token"]
+
+    def test_change_email_happy(self, client):
+        token = self._register_login(client)
+        # 创建一条旧邮箱的订阅
+        from sqlalchemy import select
+
+        from app.repository.models import Subscription
+
+        with __import__("app.infra.db", fromlist=[""])._session_factory() as s:
+            s.add(
+                Subscription(
+                    id="sub-old",
+                    exam_id=1,
+                    email="old@example.com",
+                    phone="13800138000",
+                    confirm_token="c",
+                    cancel_token="x",
+                    status=SubscriptionStatus.active,
+                )
+            )
+            s.commit()
+        # 发起迁移
+        r = client.post(
+            "/api/account/change-email",
+            json={"new_email": "new@example.com", "current_password": "password123"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        change_token = r.json()["data"]["dev_token"]
+        # 验证
+        r2 = client.get(
+            "/api/account/change-email/verify",
+            params={"token": change_token},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["data"]["email"] == "new@example.com"
+        # user.email 已更新；订阅 email 已迁移
+        with __import__("app.infra.db", fromlist=[""])._session_factory() as s:
+            sub = s.execute(select(Subscription).where(Subscription.id == "sub-old")).scalar_one()
+            assert sub.email == "new@example.com"
+
+    def test_change_email_same_email_rejected(self, client):
+        token = self._register_login(client)
+        r = client.post(
+            "/api/account/change-email",
+            json={"new_email": "old@example.com", "current_password": "password123"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "same_email"
+
+    def test_change_email_taken(self, client):
+        # 注册两个用户
+        self._register_login(client, email="old@example.com", password="password123")
+        client.post(
+            "/api/account/register",
+            json={"email": "new@example.com", "password": "password456"},
+        )
+        # old 用户尝试迁到 new
+        token = client.post(
+            "/api/account/login",
+            json={"email": "old@example.com", "password": "password123"},
+        ).json()["data"]["token"]
+        r = client.post(
+            "/api/account/change-email",
+            json={"new_email": "new@example.com", "current_password": "password123"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "email_taken"
+
+    def test_change_email_wrong_password(self, client):
+        token = self._register_login(client)
+        r = client.post(
+            "/api/account/change-email",
+            json={"new_email": "new@example.com", "current_password": "wrong"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "bad_credentials"
+
+    def test_verify_invalid_token(self, client):
+        r = client.get(
+            "/api/account/change-email/verify",
+            params={"token": "garbage"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "invalid_token"
+
+    def test_change_email_no_token_401(self, client):
+        r = client.post(
+            "/api/account/change-email",
+            json={"new_email": "new@example.com", "current_password": "password123"},
         )
         assert r.status_code == 401
