@@ -45,7 +45,7 @@ jobs:
         run: |
           ruff format --check app tests scripts > ruff-format.txt || true
           cat ruff-format.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ruff-report
@@ -76,7 +76,7 @@ jobs:
           pytest --cov=app --cov-report=xml --cov-report=term-missing -q
       - name: 上传 coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.python }}
           path: coverage.xml
@@ -111,7 +111,7 @@ jobs:
         run: |
           # 不真构建大镜像，仅校验能加载并解析
           docker build --target base --progress plain .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: docker-build-log
           path: docker-build.log
