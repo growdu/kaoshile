@@ -405,3 +405,183 @@ A: 不影响订阅关系；该账号关联的所有订阅 email 字段会同步�
 
 **Q: 管理员忘记密码怎么办？**
 A: 没有自助找回。需到部署机器上重新生成 `MANAGE_PASSWORD_HASH` 环境变量后重启服务；这是有意的安全设计。
+
+---
+
+## 5. 部署运维
+
+> 面向部署 / 运维人员；用户手册到此为止时是阅读 §1-§4；以下内容是部署侧的延伸。
+
+### 5.1 环境变量
+
+| 变量 | 必填 | 含义 |
+| --- | --- | --- |
+| `APP_ENV` | 否 | `dev` / `test` / `prod`；影响日志级别与 dev_token 是否返回 |
+| `DATABASE_URL` | 是 | SQLite：`sqlite:///./data.db`；PG：`postgresql+psycopg://user:pwd@host/db` |
+| `HMAC_SECRET` | 是 | 订阅 / 退订 token 签名密钥；变更后所有旧 token 失效 |
+| `LINK_SECRET` | 是 | ≥ 32 字节随机串；用于管理会话 token |
+| `MANAGE_PASSWORD_HASH` | 是 | bcrypt 哈希；通过 `python -c "import bcrypt; print(bcrypt.hashpw(b'pwd', bcrypt.gensalt()).decode())"` 生成 |
+| `ALIYUN_REGION` | 阿里云通道时 | cn-hangzhou / cn-shanghai 等 |
+| `ALIYUN_ACCESS_KEY_ID` | 阿里云通道时 | 阿里云 AccessKey ID |
+| `ALIYUN_ACCESS_KEY_SECRET` | 阿里云通道时 | 阿里云 AccessKey Secret |
+| `ALIYUN_DM_ACCOUNT_NAME` | 邮件时 | 发件地址 `no-reply@example.com` |
+| `ALIYUN_DM_FROM_ALIAS` | 邮件时 | 发件人别名 |
+| `ALIYUN_SMS_SIGN_NAME` | 短信时 | 控制台审核通过的签名 |
+| `ALIYUN_SMS_TEMPLATE_CODE` | 短信时 | 控制台审核通过的模板 code |
+| `REDIS_URL` | 多实例时 | `redis://host:6379/0`；启用 RedisLock |
+| `LOG_LEVEL` | 否 | DEBUG / INFO / WARNING / ERROR（默认 INFO） |
+
+### 5.2 Docker 部署
+
+```bash
+# 拉取最新镜像
+docker pull ghcr.io/growdu/kaoshile:latest
+
+# 或指定版本
+docker pull ghcr.io/growdu/kaoshile:v0.7.0
+
+# docker-compose 启动（同时跑 web + 可选 worker）
+DATABASE_URL=postgresql+psycopg://k:k@db/k \
+HMAC_SECRET=$(openssl rand -hex 32) \
+LINK_SECRET=$(openssl rand -hex 32) \
+MANAGE_PASSWORD_HASH=$(python -c "import bcrypt; print(bcrypt.hashpw(b'adminpass', bcrypt.gensalt()).decode())") \
+docker compose up -d
+```
+
+### 5.3 初始化与数据导入
+
+```bash
+# 首次部署：迁移 + 灌入 demo 数据
+docker compose exec api alembic upgrade head
+docker compose exec api python scripts/seed_demo.py    # 幂等，可重复执行
+
+# 健康检查
+curl http://localhost:8000/healthz
+curl http://localhost:8000/readyz
+```
+
+### 5.4 反向代理（Nginx 示例）
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name kaoshile.example.com;
+    ssl_certificate     /etc/ssl/certs/kaoshile.pem;
+    ssl_certificate_key /etc/ssl/private/kaoshile.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 1m;
+
+        # 速率限制（与 §3.4 一致）
+        limit_req zone=account burst=20 nodelay;
+    }
+}
+```
+
+### 5.5 日志与可观测
+
+- 应用日志：stdout；生产侧建议接 Loki / ELK / 云日志服务；
+- 结构化字段：`event` / `level` / `subscription_id` / `channel` / `node` / `attempt`；
+- 敏感字段（access_key / secret / phone / email / password / token / link_secret）在日志中**自动脱敏**（见 `app/infra/logging.py`）；
+- 健康检查 / 存活 / 就绪三件套已在 §3.2 说明。
+
+---
+
+## 6. 故障排查
+
+### 6.1 订阅提交后未收到确认邮件
+
+按以下顺序排查：
+
+1. `/api/manage/notifications?status=failed` 是否有该订阅的失败记录？
+   - 有：点开看 `error_message`；常见为阿里云 DM 模板未审核通过 → 在控制台报备后重发；
+   - 无：继续 2。
+2. `/api/manage/subscriptions?email=...` 看订阅 `status`：
+   - `pending`：用户没点确认链接 → 重发确认邮件；
+   - `active`：订阅正常，问题在通知扇出阶段 → 继续 3。
+3. `scan_now()` 是不是被锁运行过？`grep scan_skipped_lock_hed` 看是否多实例抢锁失败。
+4. 阿里云 DM / SMS 服务侧：登录控制台查看发送记录（按回执 ID）。
+
+### 6.2 节点到了但没触发通知
+
+| 现象 | 可能原因 |
+| --- | --- |
+| 监控显示 scheduler 没启动 | `app/main.py` 中 scheduler 启动失败；看启动日志 `scheduler_started` / `scheduler_failed` |
+| 调度器启动但 `scan_skipped_lock_hed` | 多实例抢锁失败（默认仅一个能跑） |
+| `scan_now` 跑但日志显示无 active 订阅 | 订阅被批量退订 / 数据库连接断开 |
+| `dispatch` 返回 false 但日志无 error | 幂等命中（已发过）；属正常行为 |
+
+### 6.3 邮箱迁移失败
+
+| 错误码 | 含义 | 解决 |
+| --- | --- | --- |
+| `invalid_email` | 新邮箱格式不合法 |
+| `email_taken` | 新邮箱已被另一账号占用 | 让用户换邮箱 |
+| `bad_credentials` | 当前密码错 |
+| `invalid_token` | 验证链接过期或已被消费 | 重新发起 change-email |
+| `user_not_found` | token 对应的用户不存在 | 重新发起 |
+
+### 6.4 数据库锁 / 连接池耗尽
+
+```
+sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10 is reached
+```
+
+→ 调大 SQLAlchemy pool_size；或检是否有未关闭的会话（最常见：usecase 异常路径未 `session.close()`）。
+
+### 6.5 重置管理员密码
+
+```bash
+# 在部署机器上：
+NEW=$(python -c \"import bcrypt; print(bcrypt.hashpw(b'new-password', bcrypt.gensalt()).decode())\")
+# 写到环境变量后重启：
+docker compose up -d --force-recreate api
+```
+
+---
+
+## 7. 升级流程
+
+### 7.1 小版本升级（v0.6.x → v0.7.x）
+
+1. 拉新镜像：`docker compose pull api`；
+2. 跑迁移：`docker compose exec api alembic upgrade head`（如有新迁移）；
+3. 重启：`docker compose up -d --force-recreate api`；
+4. 验证：`/healthz` + `/readyz` + `scripts/smoke.py`（in-process 测试）。
+
+### 7.2 大版本升级（含破坏性变更）
+
+1. 在 staging 环境先升级 + 验证全链路；
+2. 备份数据库：`pg_dump` 或 `sqlite3 .backup`；
+3. 阅读新版本 `CHANGELOG.md` 中的「变更 / 移除」段落；
+4. 若需新环境变量，先在 `.env` 加好；
+5. 跑 `alembic upgrade head`；
+6. 滚动重启：先启新实例验证 `readyz`，再切流量；
+7. 观察 30 分钟：发送成功率应 ≥ 历史 P95。
+
+### 7.3 回滚
+
+```bash
+# 1. 切回上一个镜像
+docker compose pull api:previous-tag
+docker compose up -d --force-recreate api
+
+# 2. 必要时回退迁移
+docker compose exec api alembic downgrade -1
+```
+
+> 回退迁移**仅在确认无新数据依赖新 schema 时**才安全；带数据迁移的版本升级通常不能简单回滚，需提前备份。
+
+### 7.4 备份建议
+
+| 数据 | 方式 | 频率 |
+| --- | --- | --- |
+| SQLite | `sqlite3 db.sqlite3 ".backup backup.db"` | 每日 |
+| PostgreSQL | `pg_dump` + WAL 归档 | 每日 + 持续归档 |
+| `MANAGE_PASSWORD_HASH` 之外的 `.env` | 加密存储在密码管理器 | 变更即备份 |
+
+> 备份**不要**包含 `.env`（含密钥 / 密码），存密码管理器即可。
