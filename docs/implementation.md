@@ -618,9 +618,22 @@ def frozen_clock(): ...          # freezegun
 
 ### 9.4 覆盖率门槛
 
-- 单元测试行覆盖 ≥ 80%；
+- 单元测试行覆盖 ≥ 80%；当前实现 **91%+**（见 v6.2 入 V6 后覆盖率报告）；
 - 关键模块（`reminder_policy`、`tokens`、`notification_service`、`subscription_service`）必须 100% 行覆盖；
-- CI（v1.1 引入）阻断覆盖率下降。
+- GitHub Actions（v6.2 引入）每次 push / PR 跑 `pytest --cov=app --cov-report=xml`，覆盖率作为 artifact 保留 14 天，可对照历史 PR。
+
+#### 9.4.1 CI workflow（v6.2 起）
+
+`.github/workflows/ci.yml` 提供 4 个 job：
+
+| job | 作用 | 触发条件 |
+| --- | --- | --- |
+| `lint` | ruff check + ruff format --check | 全部 push / PR（先 `continue-on-error` 出报告，后续收紧） |
+| `test` | pytest + coverage（Python 3.11） | 全部 push / PR |
+| `smoke` | `python scripts/smoke.py`（8 步端到端） | `test` 通过后 |
+| `docker` | `docker build --target base` 仅校验语法 | 仅 push 到 main |
+
+加 cache pip + `cancel-in-progress` 提速；环境变量与 `tests/conftest.py` 一致以保证本地 / CI 行为相同。
 
 ---
 
@@ -766,6 +779,9 @@ pytest tests/integration/test_smoke_script.py   # CI 回归，4 个用例覆盖�
 | 2026-10-14 | V5.1：邮箱迁移（双确认：旧密码校验 + 新邮箱验证链接；同步迁移该用户所有订阅 email） | 用户换邮箱无需重新订阅 | Mavis |
 | 2026-10-14 | V5.2：端到端冒烟脚本 `scripts/smoke.py`（in-process TestClient + Mock 通道 + freezegun 跳节点，8 步：health / list_exams / register_login / subscribe_confirm / trigger_node / cancel / change_email / dashboard） | CI / 人工回归双保险 | Mavis |
 | 2026-10-14 | **v5 完成**：351 测试全绿；2 个 commit（含 V7 补 4 文件）；v5.3 docs 更新 | v5 收尾 | Mavis |
+| 2026-10-14 | V6.1：用户手册 `docs/user_manual.md`（普通用户 10 节 + 管理员 7 节 + 公共约定 + FAQ）；自动校验脚本 `tests/unit/test_user_manual.py` 保证每条 API path 都在手册中出现一次 | 客户对接 / 后期维护可自查；防止代码与文档漂移 | Mavis |
+| 2026-10-14 | V6.2：GitHub Actions CI（`.github/workflows/ci.yml`：lint + test(pytest --cov) + smoke + docker build(仅 main)）；dev extras 加 ruff/pytest-cov/pyyaml；预先存在 ruff 历史问题先 `continue-on-error` 出报告，后续收紧 | PR / push 自动验证；CI 红绿一目了然 | Mavis |
+| 2026-10-14 | **v6 完成**：360 测试全绿；2 个 commit；v6.3 docs 更新 | v6 收尾 | Mavis |
 
 ---
 
