@@ -746,6 +746,9 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 | 2026-10-14 | V3.3：用户账号体系（User 表 + bcrypt + register/login/forgot/reset/me 5 端点） | 已注册用户可自助管理订阅 | Mavis |
 | 2026-10-14 | V3.4：模板编辑器后端（Template 表 + TemplateRenderer DB 优先 + 4 端点 CRUD + reset） | 文案可演进无需发版 | Mavis |
 | 2026-10-14 | **v3 完成**：332 测试全绿；4 个 commit；v3.5 docs 更新 | 进入 v4 规划 | Mavis |
+| 2026-10-14 | V4.1：用户自助修改联系方式（PATCH /api/account/me 改 phone / password；改密码需旧密码） | 用户无需管理员介入 | Mavis |
+| 2026-10-14 | V4.2：批量通知队列（asyncio Queue + worker + 重试入队，v1.1 可换 Redis Streams） | 扇出能力提升 | Mavis |
+| 2026-10-14 | **v4 完成**：341 测试全绿；2 个 commit；v4.3 docs 更新 | v4 收尾 | Mavis |
 
 ---
 
