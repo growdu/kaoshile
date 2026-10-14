@@ -696,6 +696,20 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
    - 管理员后台应能对每条考试「复核」 → `last_verified_at` 更新；
    - 模拟某条考试 `last_verified_at = 91 天前` → 运行复核 watchdog → 该条状态自动变 `draft`，从目录消失。
 
+#### 11.3.1 自动冒烟脚本（v5.2）
+
+`scripts/smoke.py` 把上述手动步骤自动化为 in-process 冒烟：
+
+```bash
+uv run python scripts/smoke.py            # 打印 8 步结果 + 汇总；非零退出表示有失败
+uv run python scripts/smoke.py --fail-fast
+pytest tests/integration/test_smoke_script.py   # CI 回归，4 个用例覆盖独立 step + 全链路
+```
+
+8 步覆盖：health → list_exams → register_login → subscribe_confirm → trigger_node（freezegun 跳到 registration_start - 1d 触发 standard 档提醒）→ cancel → change_email → dashboard。
+
+脚本不依赖外部网络，全部走 in-memory SQLite + MockChannel，适合在 CI 容器内每次构建前执行。
+
 ---
 
 ## 12. 验收检查清单（与 `requirements.md §8` 对齐）
@@ -749,6 +763,9 @@ uv run python scripts/send_test_sms.py    # 发一条测试短信
 | 2026-10-14 | V4.1：用户自助修改联系方式（PATCH /api/account/me 改 phone / password；改密码需旧密码） | 用户无需管理员介入 | Mavis |
 | 2026-10-14 | V4.2：批量通知队列（asyncio Queue + worker + 重试入队，v1.1 可换 Redis Streams） | 扇出能力提升 | Mavis |
 | 2026-10-14 | **v4 完成**：341 测试全绿；2 个 commit；v4.3 docs 更新 | v4 收尾 | Mavis |
+| 2026-10-14 | V5.1：邮箱迁移（双确认：旧密码校验 + 新邮箱验证链接；同步迁移该用户所有订阅 email） | 用户换邮箱无需重新订阅 | Mavis |
+| 2026-10-14 | V5.2：端到端冒烟脚本 `scripts/smoke.py`（in-process TestClient + Mock 通道 + freezegun 跳节点，8 步：health / list_exams / register_login / subscribe_confirm / trigger_node / cancel / change_email / dashboard） | CI / 人工回归双保险 | Mavis |
+| 2026-10-14 | **v5 完成**：351 测试全绿；2 个 commit（含 V7 补 4 文件）；v5.3 docs 更新 | v5 收尾 | Mavis |
 
 ---
 
