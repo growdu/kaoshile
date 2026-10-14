@@ -782,6 +782,12 @@ pytest tests/integration/test_smoke_script.py   # CI 回归，4 个用例覆盖�
 | 2026-10-14 | V6.1：用户手册 `docs/user_manual.md`（普通用户 10 节 + 管理员 7 节 + 公共约定 + FAQ）；自动校验脚本 `tests/unit/test_user_manual.py` 保证每条 API path 都在手册中出现一次 | 客户对接 / 后期维护可自查；防止代码与文档漂移 | Mavis |
 | 2026-10-14 | V6.2：GitHub Actions CI（`.github/workflows/ci.yml`：lint + test(pytest --cov) + smoke + docker build(仅 main)）；dev extras 加 ruff/pytest-cov/pyyaml；预先存在 ruff 历史问题先 `continue-on-error` 出报告，后续收紧 | PR / push 自动验证；CI 红绿一目了然 | Mavis |
 | 2026-10-14 | **v6 完成**：360 测试全绿；2 个 commit；v6.3 docs 更新 | v6 收尾 | Mavis |
+| 2026-10-14 | V7.1：CI 补强——Release workflow（打 `v*` tag 触发全测 + 推 GHCR + GitHub Release）+ Dependabot（pip + GitHub Actions 每周自动 PR）+ CODEOWNERS + Issue / PR 模板 + CHANGELOG.md（Keep a Changelog + SemVer） | PR 自动守门 + 发版零手动；9 个单测（test_ci_workflow.py 扩到 15 个） | Mavis |
+| 2026-10-14 | V7.2：需求文档升级 v7.0（v1-v7 已交付能力清单 §1.3；邮箱迁移流程 §3.4；多通道 P2 §4.5；CI / 部署 / 国际化 NFR §5；通用 + v7 专项验收标准 §9） | 需求与现状同步；新功能开发有清晰 DoD | Mavis |
+| 2026-10-14 | V7.3：设计文档升级 v7.0（新增 §16 CI 与文档自动化设计；§17 演进到 v7 的能力清单） | 设计侧补齐 | Mavis |
+| 2026-10-14 | V7.4：用户手册补强 §5 部署运维 / §6 故障排查 / §7 升级流程 | 运维侧可自查 | Mavis |
+| 2026-10-14 | V7.5：新建 `docs/best_practices.md`（10 节：commit / 测试 / 文档 / 安全 / 性能 / 部署 / 代码组织 / 数据可靠性 / 反模式 / 跨项目实践） | 团队 / 后续维护可自查 | Mavis |
+| 2026-10-14 | **v7 完成**：369 测试全绿；6 个 commit；v7.6 docs 更新 | v7 收尾；进入 v8 规划 | Mavis |
 
 ---
 

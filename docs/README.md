@@ -1,7 +1,7 @@
 # 考试通知软件 — 文档索引
 
 > 项目代号：**kaoshile**（考试乐）
-> 文档版本：v6.0（2026-10-14）
+> 文档版本：v7.0（2026-10-14）
 > 维护者：Mavis
 
 本目录存放考试通知软件的**需求、设计与实现方案**。所有开发活动以本文档集合为准；任何需求或架构变更需先更新文档，再动手改代码。
@@ -18,9 +18,11 @@
 | [implementation.md](./implementation.md) | 实现方案：里程碑、目录结构、代码骨架、测试策略、commit 节奏 | 研发 |
 | [data_sources.md](./data_sources.md) | 数据源策略与白名单：数据从哪儿来、怎么录、怎么复核 | 研发 / 数据维护员 |
 | [seed_exams.md](./seed_exams.md) | 首屏考试目录初始灌入清单（10 类 50+ 场考试） | 研发 / 数据维护员 |
-| [user_manual.md](./user_manual.md) | 用户手册：API 用法、错误码、FAQ；覆盖普通用户 + 管理员路径 | 后期维护 / 二开 / 客户对接 |
+| [user_manual.md](./user_manual.md) | 用户手册：API 用法、错误码、FAQ；覆盖普通用户 + 管理员路径 + 部署运维 + 故障排查 + 升级流程 | 后期维护 / 二开 / 客户对接 / 运维 |
+| [best_practices.md](./best_practices.md) | 最佳实践：commit 节奏、测试策略、文档维护、安全、性能、部署、反模式 | 研发 / 运维 |
+| [../CHANGELOG.md](../CHANGELOG.md) | 版本更新日志（Keep a Changelog + SemVer） | 所有人 |
 
-建议阅读顺序：**README → requirements → data_sources / seed_exams → design → implementation → user_manual（运维时翻阅）**。
+建议阅读顺序：**README → requirements → data_sources / seed_exams → design → implementation → best_practices（工程时翻阅）→ user_manual（运维 / 接入时翻阅）→ CHANGELOG（看变更时翻阅）**。
 
 ---
 
@@ -70,3 +72,4 @@
 | v4.0 | 2026-10-14 | v4 完成：用户自助修改联系方式 / 批量通知队列；341 测试全绿 |
 | v5.0 | 2026-10-14 | v5 完成：邮箱迁移（双确认流程）+ 端到端冒烟脚本；351 测试全绿 |
 | v6.0 | 2026-10-14 | v6 完成：用户手册 + GitHub Actions CI（lint/test/smoke/docker）+ 完整度自动校验；360 测试全绿 |
+| v7.0 | 2026-10-14 | v7 完成：Release workflow + Dependabot + CODEOWNERS + Issue/PR 模板 + CHANGELOG；需求 / 设计 / 用户手册补强；新建 best_practices.md；369 测试全绿 |
