@@ -1,7 +1,8 @@
 # 设计文档 — 考试通知软件
 
-> 版本：v0.1（2026-10-13）
+> 版本：**v7.0**（2026-10-14）
 > 对应需求：[requirements.md](./requirements.md)
+> 维护者：Mavis
 
 ---
 
@@ -585,4 +586,84 @@ LOG_LEVEL=INFO
 
 ---
 
+## 16. CI 与文档自动化设计（v6+）
+
+### 16.1 流水线总览
+
+```
+.github/
+├── workflows/
+│   ├── ci.yml        # 每次 push + PR：lint + test + smoke + docker
+│   └── release.yml   # 打 v* tag：跑全测 + 构建镜像 + 推 GHCR + 创建 GitHub Release
+├── dependabot.yml    # 自动 PR 更新 pip + GitHub Actions 依赖
+├── CODEOWNERS        # 路径级代码审阅 owner
+├── ISSUE_TEMPLATE/   # bug / feature 模板
+└── PULL_REQUEST_TEMPLATE.md
+```
+
+### 16.2 四个 CI job
+
+| job | 触发 | 关键命令 | 输出 |
+|---|---|---|---|
+| `lint` | push + PR | `ruff check app tests`、`ruff format --check app tests scripts` | ruff-report artifact（v7.2 前 `continue-on-error`） |
+| `test` | push + PR | `pytest --cov=app --cov-report=xml --cov-report=term-missing` | coverage.xml artifact（保留 14 天） |
+| `smoke` | 依赖 test 通过 | `python scripts/smoke.py` | 退出码；非零即挂 |
+| `docker` | 仅 main 分支 | `docker build --target base` | 仅校验语法，不推镜像 |
+
+### 16.3 Release 流程
+
+打 `vX.Y.Z` tag 后：
+
+1. release job 跑全测 + smoke（与 ci.yml 等价的检查）；
+2. `docker/login-action` + `docker/build-push-action` 把镜像推到 `ghcr.io/<owner>/kaoshile:vX.Y.Z` 与 `:latest`；
+3. `softprops/action-gh-release` 创建 GitHub Release，body 引用 `CHANGELOG.md` 对应段落；
+4. 镜像可在生产侧用 `docker pull ghcr.io/growdu/kaoshile:vX.Y.Z` 直接拉取。
+
+### 16.4 文档自动化校验
+
+| 文件 | 自动校验测试 |
+|---|---|
+| `docs/user_manual.md` | `tests/unit/test_user_manual.py`：扫 `app/api/*.py` 所有 router path 必须在手册中出现 |
+| `.github/workflows/*.yml` | `tests/unit/test_ci_workflow.py`：YAML 可解析 + 必需 job / trigger / 关键 action 都在 |
+| `.github/ISSUE_TEMPLATE/`、`CODEOWNERS`、`PULL_REQUEST_TEMPLATE.md` | 同上：存在性 + 关键字检查 |
+| `CHANGELOG.md` | 同上：必须有 `[Unreleased]` 段落与至少一个历史版本 |
+
+CI 在 lint job 跑这些测试是冗余但廉价的保险；本地 / CI 一致。
+
+### 16.5 Dependabot 策略
+
+- 每周一上午扫一次；
+- pip 依赖分组为 prod / dev；GitHub Actions 单独组；
+- PR 标题前缀 `deps:` / `ci:`；labels 自动加 `dependencies`。
+
+### 16.6 设计权衡
+
+| 权衡 | 选择 | 理由 |
+|---|---|---|
+| 是否在 PR 跑 docker build | 否（仅 main） | PR 拉镜像慢 / 缓存命中低；main 上守门足够 |
+| 是否在 lint job 失败即挂 | 否（先出报告） | 预先存在的 ruff 历史问题不能阻碍 CI 红绿；v7.4+ 计划收紧 |
+| 是否引入 codecov / SonarQube | 否 | 单人维护项目，自带 coverage artifact 已够；后续若团队化再上 |
+| 是否自动发版（release-please / semantic-release） | 否 | 单人维护 + 6 个版本一直手动；v9+ 若引入多人协作再考虑 |
+
+---
+
+## 17. 演进到 v7 的能力清单
+
+| 版本 | 新增能力 | 设计文档对应章节 |
+|---|---|---|
+| v1 | 单容器单实例；阿里云邮件 / 短信；HMAC token；APScheduler | §1, §3, §7 |
+| v2 | 解析助手 parse_helper；受限 Fetcher；数据看板 API；微信通道 | §8, 新增 §10 看板 |
+| v3 | 钉钉 / 飞书通道；Redis 分布式锁；用户账号体系；模板编辑器（DB 优先） | §8, §9.3, §10 |
+| v4 | 用户自助修改联系方式；NotifyQueue（asyncio Queue + worker） | §11 测试隔离 |
+| v5 | 邮箱迁移（双确认）；端到端冒烟脚本 scripts/smoke.py | §16.2 |
+| v6 | 用户手册；CI workflow（lint + test + smoke + docker） | §16 |
+| v7 | Release workflow；Dependabot；CODEOWNERS；Issue / PR 模板；CHANGELOG | §16 |
+
+---
+
 > 文档结束。任何架构变动请同步更新本文档并升级版本号。
+
+| 版本 | 日期 | 变更摘要 |
+|---|---|---|
+| v0.1 | 2026-10-13 | 初始版本 |
+| v7.0 | 2026-10-14 | 升级到 v7：新增 §16 CI / 文档自动化设计、§17 演进能力清单；版本号与维护者标注 |
