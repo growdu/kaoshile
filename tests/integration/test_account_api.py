@@ -197,3 +197,74 @@ class TestMeSubscriptions:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 401
+
+
+class TestUpdateMe:
+    """PATCH /api/account/me。"""
+
+    def _register_login(self, client, *, email="u@example.com", password="password123"):
+        client.post(
+            "/api/account/register",
+            json={"email": email, "password": password},
+        )
+        r = client.post(
+            "/api/account/login", json={"email": email, "password": password}
+        )
+        return r.json()["data"]["token"]
+
+    def test_update_phone(self, client):
+        token = self._register_login(client)
+        r = client.patch(
+            "/api/account/me",
+            json={"phone": "13800138001"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["data"]["phone"] == "13800138001"
+
+    def test_update_password_happy(self, client):
+        token = self._register_login(client)
+        r = client.patch(
+            "/api/account/me",
+            json={"current_password": "password123", "new_password": "newpassword456"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        # 旧密码不能再登录
+        r2 = client.post(
+            "/api/account/login",
+            json={"email": "u@example.com", "password": "password123"},
+        )
+        assert r2.status_code == 401
+        # 新密码可以
+        r3 = client.post(
+            "/api/account/login",
+            json={"email": "u@example.com", "password": "newpassword456"},
+        )
+        assert r3.status_code == 200
+
+    def test_update_password_wrong_current(self, client):
+        token = self._register_login(client)
+        r = client.patch(
+            "/api/account/me",
+            json={"current_password": "wrong", "new_password": "newpassword456"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "bad_credentials"
+
+    def test_update_password_missing_current(self, client):
+        token = self._register_login(client)
+        r = client.patch(
+            "/api/account/me",
+            json={"new_password": "newpassword456"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "missing_current_password"
+
+    def test_no_token_401(self, client):
+        r = client.patch(
+            "/api/account/me", json={"phone": "13800138001"}
+        )
+        assert r.status_code == 401

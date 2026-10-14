@@ -116,6 +116,30 @@ class AccountService:
             raise AccountError("user_not_found", "用户不存在")
         self.user_repo.set_password(user, self.hash_password(new_password))
 
+    def update_profile(
+        self,
+        user_id: str,
+        *,
+        phone: Optional[str] = None,
+        current_password: Optional[str] = None,
+        new_password: Optional[str] = None,
+    ) -> User:
+        """用户自助更新：phone 可直接改；改密码需 current_password 校验。"""
+        user = self.user_repo.get(user_id)
+        if user is None:
+            raise AccountError("user_not_found", "用户不存在")
+        if phone is not None:
+            self.user_repo.update_profile(user, phone=phone)
+        if new_password is not None:
+            if not current_password:
+                raise AccountError("missing_current_password", "改密码需提供旧密码")
+            if not self.verify_password(current_password, user.password_hash):
+                raise AccountError("bad_credentials", "旧密码错误")
+            if len(new_password) < 8:
+                raise AccountError("weak_password", "新密码至少 8 位")
+            self.user_repo.set_password(user, self.hash_password(new_password))
+        return user
+
     @staticmethod
     def require_user(token: str) -> dict:
         """校验 token 是 user 角色。"""

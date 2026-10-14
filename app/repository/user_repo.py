@@ -38,3 +38,14 @@ class UserRepository:
     def set_password(self, user: User, password_hash: str) -> None:
         user.password_hash = password_hash
         self.session.flush()
+
+    def update_profile(
+        self,
+        user: User,
+        *,
+        phone: Optional[str] = None,
+    ) -> User:
+        if phone is not None:
+            user.phone = phone or None
+        self.session.flush()
+        return user

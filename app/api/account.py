@@ -1,10 +1,11 @@
 """用户账户 API：注册 / 登录 / 我的订阅 / 找回密码 / 重置。"""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.infra.db import get_db
@@ -45,8 +46,17 @@ class ResetIn(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
+    phone: Optional[str] = None
+
+
+class UpdateMeIn(BaseModel):
+    phone: Optional[str] = Field(None, max_length=20)
+    current_password: Optional[str] = Field(None, min_length=1, max_length=200)
+    new_password: Optional[str] = Field(None, min_length=1, max_length=200)
 
 
 def _service(db: Session) -> AccountService:
@@ -79,6 +89,36 @@ def login(payload: LoginIn, db: Session = Depends(get_db)) -> dict:
     except AccountError as e:
         raise _err(e.code, e.message, 401)
     return {"ok": True, "data": {"token": token, "expires_in_days": 1}}
+
+
+@router.patch("/api/account/me", tags=["account"])
+def update_me(
+    payload: UpdateMeIn,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    """自助更新：phone / password（改密码需 current_password）。"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise _err("unauthorized", "missing bearer token", 401)
+    token = authorization.split(" ", 1)[1]
+    try:
+        auth = AccountService.require_user(token)
+    except AccountError as e:
+        raise _err(e.code, e.message, 401)
+    svc = _service(db)
+    try:
+        user = svc.update_profile(
+            auth["user_id"],
+            phone=payload.phone,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+    except AccountError as e:
+        raise _err(e.code, e.message, 400)
+    return {
+        "ok": True,
+        "data": UserOut(id=user.id, email=user.email, phone=user.phone).model_dump(),
+    }
 
 
 @router.get("/api/account/me/subscriptions", tags=["account"])
