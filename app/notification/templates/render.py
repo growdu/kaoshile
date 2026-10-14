@@ -2,14 +2,14 @@
 
 约定：
 - 占位符用 `{name}` 形式，未提供的占位符原样保留；
-- 模板硬编码于本模块（v1 简化），未来可改为数据库 / 文件；
+- 默认模板硬编码于本模块；DB 中存在同名模板时优先用 DB；
 - 所有模板必须包含退订链接（合规）；
 - 模板提供纯函数渲染，不做副作用。
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Mapping
+from typing import Mapping, Optional
 
 from app.repository.orm import NodeType
 

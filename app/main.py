@@ -19,6 +19,7 @@ from app.api.account import router as account_router
 from app.api.dashboard import router as dashboard_router
 from app.api.manage import router as manage_router
 from app.api.public import router as public_router
+from app.api.templates import router as templates_router
 from app.config import get_settings
 from app.infra.db import get_engine, init_db
 from app.infra.logging import configure_logging, get_logger
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(manage_router)
     app.include_router(dashboard_router)
     app.include_router(account_router)
+    app.include_router(templates_router)
 
     # ---------- 统一错误信封 ----------
     @app.exception_handler(HTTPException)

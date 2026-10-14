@@ -172,3 +172,19 @@ class User(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     __table_args__ = (Index("ix_user_email", "email"),)
+
+
+class Template(Base):
+    """通知模板（v3 允许管理员覆盖默认文案）。"""
+
+    __tablename__ = "template"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)
+    subject: Mapped[str | None] = mapped_column(String(500))
+    body: Mapped[str] = mapped_column(String(4000))
+    channel: Mapped[str] = mapped_column(String(20))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    updated_by: Mapped[str | None] = mapped_column(String(50))
+
+    __table_args__ = (Index("ix_template_name", "name"),)
