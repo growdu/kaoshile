@@ -23,6 +23,7 @@ dev = [
     "freezegun>=1.4",
     "pytest-cov>=5.0",
     "ruff>=0.5",
+    "pyyaml>=6.0",
 ]
 aliyun = [
     "alibabacloud_dysmsapi20170525>=1.0",
