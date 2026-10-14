@@ -1,0 +1,20 @@
+# CODEOWNERS：定义每个路径的代码审阅负责人。
+# GitHub 自动在 PR 中请求指定 owner 的 review。
+
+# 所有文件默认由维护者 review
+*       @growdu
+
+# 文档（变更频繁，允许单人 review）
+/docs/  @growdu
+
+# CI / CD 配置（变更需谨慎）
+/.github/ @growdu
+
+# 通知通道（影响真实用户）
+/app/notification/   @growdu
+
+# 调度器（多实例安全相关）
+/app/scheduler/      @growdu
+
+# 数据库迁移（不可逆变更需 review 充分）
+/migrations/          @growdu

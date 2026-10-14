@@ -1,0 +1,34 @@
+# Dependabot 配置：自动 PR 更新 Python 依赖与 GitHub Actions 版本。
+# 每周一上午（北京时间）扫一次，PR 默认最多 5 个同时进行。
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    open-pull-requests-limit: 5
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Shanghai"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+    # 锁定到已声明的 extras，避免引入未使用依赖
+    groups:
+      prod:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    open-pull-requests-limit: 3
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Shanghai"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
